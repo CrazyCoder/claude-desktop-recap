@@ -1,5 +1,5 @@
-/** A recap and the transcript length it summarizes. */
-export type Recap = { text: string; at: number }
+/** A recap, the transcript length it summarizes and the prompt that asked for it. */
+export type Recap = { text: string; at: number; prompt: string }
 
 declare module 'claude-code' {
   interface PluginState {

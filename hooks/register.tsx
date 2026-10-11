@@ -70,25 +70,31 @@ async function transcriptLength($: EngineInterface) {
   return (await $.session.messages()).length
 }
 
-// Reuses the recap already made for this point of the transcript, else asks
-// the model over the session's cached transcript, as the TUI does.
+function isCurrent(kept: Recap | null | undefined, at: number): kept is Recap {
+  return kept?.at === at && kept.prompt === recapPrompt
+}
+
+// Reuses the recap already made for this point of the transcript with this
+// prompt, else asks the model over the session's cached transcript, as the
+// TUI does.
 async function recapNow($: EngineInterface) {
   if (isGenerating || (await $.session.turns()) < MIN_TURNS) return
   const at = await transcriptLength($)
-  if ((await read($, recap))?.at === at) return
+  if (isCurrent(await read($, recap), at)) return
 
   const stored = (await loadRecord($)).recap
-  if (stored !== undefined && stored.at === at) {
+  if (isCurrent(stored, at)) {
     await show($, stored, false)
     return
   }
 
   isGenerating = true
   try {
-    const reply = await $.model.fork({ prompt: recapPrompt })
+    const prompt = recapPrompt
+    const reply = await $.model.fork({ prompt })
     // A prompt sent while the fork ran makes its answer stale.
     if (reply.isAnswered && reply.text.trim() && (await transcriptLength($)) === at) {
-      await show($, { text: reply.text.trim(), at }, false)
+      await show($, { text: reply.text.trim(), at, prompt }, false)
     }
   } finally {
     isGenerating = false
@@ -116,7 +122,8 @@ async function resumeAway($: EngineInterface, awayMs: number) {
 
 async function keepManualRecap($: EngineInterface, text: string) {
   cancelAway()
-  await show($, { text, at: await transcriptLength($) }, true)
+  // Kept under the current prompt, so the band does not redraft it.
+  await show($, { text, at: await transcriptLength($), prompt: recapPrompt }, true)
 }
 
 async function startSession($: EngineInterface, awayMs: number) {

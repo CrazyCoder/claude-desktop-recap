@@ -60,10 +60,10 @@ Each is a row in the terminal's `/config`, or set them in
 }
 ```
 
-The built-in prompt asks for one to three short sentences: the high-level
-task first, then the concrete next step, with no status report or commit
-recap. A new prompt applies to the next recap the mod drafts. A recap
-already kept for the current point of the session is reused as it is.
+The built-in prompt is `DEFAULT_PROMPT` in
+[hooks/register.tsx](hooks/register.tsx). A kept recap is reused only while
+it was made with the current prompt, so a new prompt takes effect at the next
+recap.
 
 ## Development
 

@@ -183,6 +183,24 @@ for (const [name, prompt, expected] of [
   })
 }
 
+for (const [name, keptPrompt, forksExpected, shown] of [
+  ['reuses a kept recap made with the current prompt', 'Recap it.', 0, /recap: Kept\.$/],
+  ['redrafts a kept recap made with another prompt', 'Old prompt.', 1, /recap: Fixing the build/],
+] as const) {
+  test(name, { options: { prompt: 'Recap it.' } }, async ($, on) => {
+    // Four turns: eight transcript rows, the point the kept recap covers.
+    const kept = { recap: { text: 'Kept.', at: 8, prompt: keptPrompt } }
+    const { clock, forks } = world(on, 4, { 'session:session-1': kept })
+    await $.turn.complete(TURN)
+    await clock.advance(AWAY_MS)
+    await clock.settle()
+    expect(forks()).toBe(forksExpected)
+
+    const band = await $.ui.mount({ plugin: 'desktop-recap', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+    expect(await band.find({ text: shown })).toBeDefined()
+  })
+}
+
 test('no recap before three turns', async ($, on) => {
   const { clock, forks } = world(on, 2)
   await $.turn.complete(TURN)
