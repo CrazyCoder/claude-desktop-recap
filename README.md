@@ -41,14 +41,29 @@ app starts load it from then on.
 
 ## Settings
 
-`awayMinutes` (1-120, default 3) is a row in the terminal's `/config`, or set
-it in `~/.claude/settings.json`:
+| Option | Default | What it does |
+| --- | --- | --- |
+| `awayMinutes` | `3` | Idle minutes after Claude's last reply before the recap shows (1-120). |
+| `prompt` | empty | What the model is asked when it drafts a recap. Empty uses the built-in prompt. |
+
+Each is a row in the terminal's `/config`, or set them in
+`~/.claude/settings.json`:
 
 ```json
 "pluginConfigs": {
-  "desktop-recap": { "options": { "awayMinutes": 10 } }
+  "desktop-recap": {
+    "options": {
+      "awayMinutes": 10,
+      "prompt": "In one sentence: what am I working on, and what is the next step?"
+    }
+  }
 }
 ```
+
+The built-in prompt asks for one to three short sentences: the high-level
+task first, then the concrete next step, with no status report or commit
+recap. A new prompt applies to the next recap the mod drafts. A recap
+already kept for the current point of the session is reused as it is.
 
 ## Development
 

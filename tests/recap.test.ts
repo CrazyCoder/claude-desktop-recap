@@ -29,6 +29,7 @@ function world(on: On, turns: number, store: Record<string, unknown> = {}) {
   })
   on('store.keys', () => ({ value: [...stored.keys()] }))
   let forks = 0
+  const prompts: string[] = []
   let length = turns * 2
   let onFork = () => {}
   on('turn.complete', () => ({ text: 'done' }))
@@ -41,14 +42,16 @@ function world(on: On, turns: number, store: Record<string, unknown> = {}) {
   on('session.messages', () => ({
     value: Array.from({ length }, () => ({ role: 'user', text: 'x', toolUses: [] })) as never,
   }))
-  on('model.fork', () => {
+  on('model.fork', (_, e) => {
     forks += 1
+    prompts.push(e.prompt)
     onFork()
     return { value: { isAnswered: true, text: ' Fixing the build. Next: rerun it. ', usage: {} } as never }
   })
   return {
     clock,
     stored,
+    prompts,
     forks: () => forks,
     // Runs while the next fork is in flight.
     duringFork: (fn: () => void) => {
@@ -164,6 +167,21 @@ test('the store keeps the most recently active sessions', async ($, on) => {
   expect(stored.has('session:old-0')).toBe(false)
   expect(stored.has('session:old-1')).toBe(true)
 })
+
+for (const [name, prompt, expected] of [
+  ['the default prompt', undefined, /^The user stepped away and is coming back\./],
+  ['a custom prompt', 'Summarize in one line.', /^Summarize in one line\.$/],
+  ['a blank prompt falls back to the default', '   ', /^The user stepped away and is coming back\./],
+] as const) {
+  test(`asks with ${name}`, { options: prompt === undefined ? {} : { prompt } }, async ($, on) => {
+    const { clock, prompts } = world(on, 4)
+    await $.turn.complete(TURN)
+    await clock.advance(AWAY_MS)
+    await clock.settle()
+    expect(prompts).toHaveLength(1)
+    expect(prompts[0]).toMatch(expected)
+  })
+}
 
 test('no recap before three turns', async ($, on) => {
   const { clock, forks } = world(on, 2)

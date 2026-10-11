@@ -13,8 +13,9 @@ const isDismissed = atom({ plugin: 'desktop-recap', key: 'isDismissed' } as cons
 // at least three turns.
 const MIN_TURNS = 3
 
-// The prompt of @jetserge/pi-session-recap, which mimics Claude Code's recap.
-const RECAP_PROMPT =
+// The prompt of @jetserge/pi-session-recap, which mimics Claude Code's recap;
+// the `prompt` option replaces it.
+const DEFAULT_PROMPT =
   'The user stepped away and is coming back. Write exactly 1-3 short sentences. ' +
   'Start by stating the high-level task — what they are building or debugging, not ' +
   'implementation details. Next: the concrete next step. Skip status reports and commit recaps.'
@@ -26,6 +27,7 @@ const SESSION_PREFIX = 'session:'
 
 let away: Timer | undefined
 let isGenerating = false
+let recapPrompt = DEFAULT_PROMPT
 
 function cancelAway() {
   away?.cancel()
@@ -83,7 +85,7 @@ async function recapNow($: EngineInterface) {
 
   isGenerating = true
   try {
-    const reply = await $.model.fork({ prompt: RECAP_PROMPT })
+    const reply = await $.model.fork({ prompt: recapPrompt })
     // A prompt sent while the fork ran makes its answer stale.
     if (reply.isAnswered && reply.text.trim() && (await transcriptLength($)) === at) {
       await show($, { text: reply.text.trim(), at }, false)
@@ -128,6 +130,7 @@ async function dismiss($: EngineInterface) {
 
 export const register: Register = (on, options) => {
   const awayMs = Number(options.awayMinutes) * 60 * 1000
+  recapPrompt = String(options.prompt ?? '').trim() || DEFAULT_PROMPT
 
   on('session.start', async ($, e, next) => {
     const result = await next(e)
