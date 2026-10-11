@@ -1,0 +1,6 @@
+{
+  "name": "claude-desktop-recap",
+  "description": "The desktop-recap mod: Claude Code's terminal session recap in the desktop app.",
+  "owner": { "name": "Serge Baranov" },
+  "plugins": [{ "name": "desktop-recap", "source": "./" }]
+}
