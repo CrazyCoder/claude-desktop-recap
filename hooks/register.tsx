@@ -175,12 +175,13 @@ export const register: Register = (on, options) => {
       return next(e)
     }
 
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const { Box, Button, Markdown } = $.ui.resolve(e)
 
+    // The model writes markdown, links included; the surface draws it as a reply.
     return (
       <Box flexDirection="row" gap={1}>
         <Box flexGrow={1}>
-          <Text>※ recap: {current.text}</Text>
+          <Markdown text={`※ recap: ${current.text}`} />
         </Box>
         <Button key="dismiss" role="dismiss" label="Dismiss" onPress={() => dismiss($)} />
       </Box>
