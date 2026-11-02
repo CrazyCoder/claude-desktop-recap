@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
-import type { On, RenderPropsOf } from 'claude-code'
+import type { On, RenderPropsOf, RenderSurface } from 'claude-code'
 
 const BAND = {
   hasSurvey: false,
@@ -15,7 +15,12 @@ const START = { cwd: '/work', surface: 'desktop', isInteractive: false } as cons
 
 const AWAY_MS = 3 * 60 * 1000
 
-function world(on: On, turns: number, store: Record<string, unknown> = {}) {
+function world(
+  on: On,
+  turns: number,
+  store: Record<string, unknown> = {},
+  surfaces: readonly RenderSurface[] = ['desktop'],
+) {
   const clock = mock.clock(on)
   const stored = new Map(Object.entries(store))
   on('store.get', (_, e) => ({ value: stored.get(e.key) }))
@@ -39,6 +44,7 @@ function world(on: On, turns: number, store: Record<string, unknown> = {}) {
   on('ui.render', ($, e) => h($.ui.resolve(e).Box, { key: 'engine-band' }) as never)
   on('session.id', () => ({ value: 'session-1' }))
   on('session.turns', () => ({ value: turns }))
+  on('session.surfaces', () => ({ value: surfaces }))
   on('session.messages', () => ({
     value: Array.from({ length }, () => ({ role: 'user', text: 'x', toolUses: [] })) as never,
   }))
@@ -63,42 +69,71 @@ function world(on: On, turns: number, store: Record<string, unknown> = {}) {
   }
 }
 
-for (const surface of ['terminal', 'desktop'] as const) {
-  test(`${surface}: recaps after three idle minutes and reuses it`, async ($, on) => {
-    const { clock, forks } = world(on, 4)
+test('recaps after three idle minutes and reuses it', async ($, on) => {
+  const { clock, forks } = world(on, 4)
 
-    await $.turn.complete(TURN)
-    await clock.advance(AWAY_MS - 1)
-    expect(forks()).toBe(0)
-    await clock.advance(1)
-    await clock.settle()
-    expect(forks()).toBe(1)
+  await $.turn.complete(TURN)
+  await clock.advance(AWAY_MS - 1)
+  expect(forks()).toBe(0)
+  await clock.advance(1)
+  await clock.settle()
+  expect(forks()).toBe(1)
 
-    const band = await $.ui.mount({ plugin: 'desktop-recap', surface, component: 'AbovePrompt', props: BAND })
-    expect((await band.find({ text: /recap: Fixing the build\. Next: rerun it\.$/ }))?.text).toBeDefined()
+  const band = await $.ui.mount({ plugin: 'desktop-recap', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect((await band.find({ text: /recap: Fixing the build\. Next: rerun it\.$/ }))?.text).toBeDefined()
 
-    // Nothing new happened: the next idle period reuses the recap.
-    await $.turn.complete(TURN)
-    await clock.advance(AWAY_MS)
-    await clock.settle()
-    expect(forks()).toBe(1)
+  // Nothing new happened: the next idle period reuses the recap.
+  await $.turn.complete(TURN)
+  await clock.advance(AWAY_MS)
+  await clock.settle()
+  expect(forks()).toBe(1)
 
-    await band.press({ key: 'dismiss' })
-    expect(await band.find({ text: /recap:/ })).toBeUndefined()
-  })
+  await band.press({ key: 'dismiss' })
+  expect(await band.find({ text: /recap:/ })).toBeUndefined()
+})
 
-  test(`${surface}: the next prompt takes the recap down`, async ($, on) => {
-    const { clock } = world(on, 4)
-    await $.turn.complete(TURN)
-    await clock.advance(AWAY_MS)
-    await clock.settle()
+test('the next prompt takes the recap down', async ($, on) => {
+  const { clock } = world(on, 4)
+  await $.turn.complete(TURN)
+  await clock.advance(AWAY_MS)
+  await clock.settle()
 
-    const band = await $.ui.mount({ plugin: 'desktop-recap', surface, component: 'AbovePrompt', props: BAND })
-    expect(await band.find({ text: /recap:/ })).toBeDefined()
-    await $.prompt.submit({ text: 'go on' } as never)
-    expect(await band.find({ text: /recap:/ })).toBeUndefined()
-  })
-}
+  const band = await $.ui.mount({ plugin: 'desktop-recap', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect(await band.find({ text: /recap:/ })).toBeDefined()
+  await $.prompt.submit({ text: 'go on' } as never)
+  expect(await band.find({ text: /recap:/ })).toBeUndefined()
+})
+
+test('a terminal session drafts no recap', async ($, on) => {
+  const { clock, forks } = world(on, 4, {}, ['terminal'])
+  await $.turn.complete(TURN)
+  await clock.advance(AWAY_MS)
+  await clock.settle()
+  expect(forks()).toBe(0)
+
+  await $.session.start(START)
+  await clock.settle()
+  expect(forks()).toBe(0)
+})
+
+test('a session with no surface attached yet still recaps', async ($, on) => {
+  const { clock, forks } = world(on, 4, {}, [])
+  await $.turn.complete(TURN)
+  await clock.advance(AWAY_MS)
+  await clock.settle()
+  expect(forks()).toBe(1)
+})
+
+test('only the desktop app draws the band', async ($, on) => {
+  const { clock } = world(on, 4)
+  await $.turn.complete(TURN)
+  await clock.advance(AWAY_MS)
+  await clock.settle()
+
+  const band = await $.ui.mount({ plugin: 'desktop-recap', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  expect(await band.find({ text: /recap:/ })).toBeUndefined()
+  expect(await band.find({ key: 'dismiss' })).toBeUndefined()
+})
 
 test('awayMinutes sets the idle delay', { options: { awayMinutes: 10 } }, async ($, on) => {
   const { clock, forks } = world(on, 4)

@@ -79,6 +79,9 @@ function isCurrent(kept: Recap | null | undefined, at: number): kept is Recap {
 // TUI does.
 async function recapNow($: EngineInterface) {
   if (isGenerating || (await $.session.turns()) < MIN_TURNS) return
+  // A terminal draws Claude Code's own recap. The desktop app attaches after
+  // session.start, so an empty roster still counts as the app.
+  if ((await $.session.surfaces()).includes('terminal')) return
   const at = await transcriptLength($)
   if (isCurrent(await read($, recap), at)) return
 
@@ -170,6 +173,7 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.surface !== 'desktop') return next(e)
     const current = await read($, recap)
     if (e.props.hasSurvey || e.props.isWorking || current === null || (await read($, isDismissed))) {
       return next(e)

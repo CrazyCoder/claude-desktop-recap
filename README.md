@@ -11,6 +11,9 @@ draws the same kind of recap above the prompt:
 ※ recap: You're fixing a failing build after an upstream rebase. Next: re-run the build.
 ```
 
+The mod works in the desktop app only. A terminal session keeps Claude Code's
+own recap: there the mod makes no request and draws nothing.
+
 ## Install
 
 In a terminal Claude Code session:
